@@ -16,20 +16,20 @@ import * as utils from './utils.js';
 const term = terminal.terminal;
 
 export class OpenShieldTUI {
-  private spinner: ora.Ora | null = null;
+  private spinner: any = null;
 
   constructor() {
     // Setup terminal
     term.clear();
     term.hideCursor();
-    term.grabInput(); // Enable raw input mode for arrow keys
+    term.grabInput({}); // Enable raw input mode for arrow keys
     process.on('exit', () => {
-      term.showCursor();
+      // term.showCursor(false);
       term.moveTo(1, term.height);
       term('\n');
     });
     process.on('SIGINT', () => {
-      term.showCursor();
+      // term.showCursor(false);
       process.exit(0);
     });
   }
@@ -90,11 +90,10 @@ export class OpenShieldTUI {
         terminal: true
       });
 
-      rl.input.setRawMode(true);
+      (rl as any).input.setRawMode(true);
 
-      rl.input.on('data', (key) => {
+      (rl as any).input.on('data', (key: Buffer) => {
         const keyStr = key.toString();
-        console.log('DEBUG Key received:', JSON.stringify(keyStr), 'code:', keyStr.charCodeAt(0));
 
         if (keyStr === '\u001b[A') { // Up arrow
           selectedIndex = Math.max(0, selectedIndex - 1);
@@ -107,7 +106,7 @@ export class OpenShieldTUI {
           resolve(items[selectedIndex].value);
         } else if (keyStr === '\u0003') { // Ctrl+C
           rl.close();
-          term.showCursor();
+          // term.showCursor();
           process.exit(0);
         }
       });
@@ -207,9 +206,9 @@ export class OpenShieldTUI {
       term.inputField({
         default: defaultValue,
         cancelable: true
-      }, (error: any, input: string) => {
+      }, (error: any, input: string | undefined) => {
         if (error) {
-          term.showCursor();
+          // term.showCursor(false);
           process.exit(1);
         }
         term('\n');

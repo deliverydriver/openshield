@@ -28,8 +28,6 @@ program
     const opts = program.opts();
     const useTui = opts.tui !== false;
 
-    console.log('DEBUG options', opts, 'yes', yes, 'useTui', useTui);
-
     if (useTui) {
       // Use the new TUI
       const tui = new OpenShieldTUI();
