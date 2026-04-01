@@ -9,7 +9,7 @@
   "homepage": "https://github.com/openshield/openshield",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/openshield/openshield.git"
+    "url": "git+https://github.com/deliverydriver/openshield.git"
   },
   "bugs": {
     "url": "https://github.com/openshield/openshield/issues"
