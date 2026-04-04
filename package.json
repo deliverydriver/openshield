@@ -1,6 +1,6 @@
 {
   "name": "openshield",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "One-command installer and configurator for OpenClaw agents connected to the OpenShield dashboard.",
   "author": {
     "name": "OpenShield Team"
@@ -12,12 +12,12 @@
     "url": "git+https://github.com/deliverydriver/openshield.git"
   },
   "bugs": {
-    "url": "https://github.com/openshield/openshield/issues"
+    "url": "https://github.com/deliverydriver/openshield/issues"
   },
   "bin": {
     "openshield": "dist/cli.js"
   },
-  "main": "dist/index.cjs",
+  "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
@@ -60,13 +60,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     },
     "./cli": {
       "types": "./dist/cli.d.ts",
       "import": "./dist/cli.js",
-      "require": "./dist/cli.cjs"
+      "require": "./dist/cli.js"
     }
   }
 }

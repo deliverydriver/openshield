@@ -25,21 +25,24 @@ export function resolveOpenClawExecutable(openClawRoot?: string): string {
   }
 
   // Check system PATH
-  // Check system PATH
   const result = spawnSync('which', ['openclaw'], { encoding: 'utf8' });
   if (result.status === 0 && result.stdout.trim()) {
     return result.stdout.trim();
   }
 
-  return 'openclaw'; // Not found // Not found
+  return 'openclaw'; // Not found
 }
 
-export async function runCommand(cmd: string, args: string[], options: SpawnOptions = {}): Promise<string> {
+export async function runCommand(cmd: string, args: string[], options: SpawnOptions = {}, input?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn(cmd, args, { stdio: 'pipe', ...options });
     let output = '';
     proc.stdout?.on('data', (chunk) => { output += chunk.toString(); });
     proc.stderr?.on('data', (chunk) => { output += chunk.toString(); });
+    if (input) {
+      proc.stdin?.write(input);
+      proc.stdin?.end();
+    }
     proc.on('close', (code) => {
       if (code === 0) {
         resolve(output.trim());
@@ -101,8 +104,36 @@ export function detectOpenClaw(openClawRoot?: string): boolean {
 export async function addAgent(agentName: string, openClawRoot?: string): Promise<void> {
   const exePath = resolveOpenClawExecutable(openClawRoot);
   console.log(`   🤖 Adding agent "${agentName}" to OpenClaw...`);
-  await runCommand(exePath, ['agents', 'add', agentName]);
+
+  // Prefer non-interactive `--yes` if available, but still send line breaks to handle prompts gracefully.
+  const cmdArgs = ['agents', 'add', agentName, '--yes'];
+  console.log(`   📋 Running: ${exePath} ${cmdArgs.join(' ')}`);
+
+  // If openclaw prompts for values, send multiple enters to accept defaults.
+  const input = '\n\n\n\n\n';
+
+  let output;
+  try {
+    output = await runCommand(exePath, cmdArgs, {}, input);
+  } catch (error: any) {
+    console.log('   ⚠️ --yes may not be supported, retrying without flag with interactive defaults...');
+    output = await runCommand(exePath, ['agents', 'add', agentName], {}, input);
+  }
+
+  if (output) {
+    console.log(`   📝 Output: ${output}`);
+  }
   console.log(`   ✅ Agent "${agentName}" added to OpenClaw`);
+}
+
+export async function getOpenClawConfig(openClawRoot?: string): Promise<any> {
+  const configPath = path.join(openClawRoot || path.join(os.homedir(), '.openclaw'), 'openclaw.json');
+  try {
+    const data = await fs.promises.readFile(configPath, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    return {};
+  }
 }
 
 export async function installOpenClaw(openClawRoot?: string): Promise<string> {
@@ -114,6 +145,7 @@ export async function installOpenClaw(openClawRoot?: string): Promise<string> {
 
   // Run the official installer
   const installCmd = `curl -fsSL https://openclaw.ai/install.sh | bash -s -- --no-onboard${openClawRoot ? ` --prefix ${openClawRoot}` : ''}`;
+  console.log(`   📋 Running installation command: ${installCmd}`);
 
   try {
     const result = await runCommand('sh', ['-c', installCmd]);

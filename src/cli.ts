@@ -2,10 +2,10 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import os from 'os';
 import path from 'path';
+import fs from 'fs/promises';
 import { setModel } from './config.js';
 import { create } from './orientation.js';
 import { startGateway } from './gateway.js';
-import { sendDirective } from './directive.js';
 import { heartbeat } from './reporter.js';
 import * as utils from './utils.js';
 import { OpenShieldTUI } from './tui.js';
@@ -13,7 +13,7 @@ import { OpenShieldTUI } from './tui.js';
 const program = new Command()
   .name('openshield')
   .description('One-command OpenClaw + OpenShield setup')
-  .version('0.1.0');
+  .version('0.4.0');
 
 program.option('-y, --yes', 'non-interactive mode (defaults)', false);
 program.option('--tui', 'enable terminal user interface', true);
@@ -26,7 +26,7 @@ program
   .action(async (cmd) => {
     const yes = cmd.yes || program.opts().yes;
     const opts = program.opts();
-    const useTui = opts.tui !== false;
+    const useTui = opts.tui !== false && process.stdout.isTTY;
 
     if (useTui) {
       // Use the new TUI
@@ -135,7 +135,7 @@ program
       console.log('\n🌐 Starting OpenClaw Gateway...');
       await startGateway(openClawRoot);
 
-      console.log('\\n📤 System directive injection skipped (directive command not available)...');
+      console.log('\\n📤 System directive injection skipped (OpenClaw directive command not available in current toolchain)...');
       // await sendDirective(openClawRoot);
 
       console.log('\\n❤️ Testing dashboard connection...');
@@ -152,8 +152,52 @@ program
     }
   });
 
-// CLI entry point detection (CJS/ESM)
-if (__filename === process.argv[1]) {
+program
+  .command('tui')
+  .description('Launch the OpenShield Terminal User Interface')
+  .action(async () => {
+    if (!process.stdout.isTTY) {
+      console.error('Error: TUI requires an interactive terminal (TTY). Use `openshield init --no-tui` for non-interactive setup.');
+      process.exit(1);
+    }
+    const tui = new OpenShieldTUI();
+    await tui.run();
+  });
+
+program
+  .command('status')
+  .description('Show OpenShield/OpenClaw status in the current workspace')
+  .action(async () => {
+    console.log('\\n📊 OpenShield Status');
+    console.log('--------------------');
+
+    try {
+      const openClawAvailable = utils.detectOpenClaw();
+      console.log(`OpenClaw CLI: ${openClawAvailable ? 'Available' : 'Not found'}`);
+    } catch (error: any) {
+      console.log(`OpenClaw CLI: Error (${error?.message || String(error)})`);
+    }
+
+    try {
+      const config = await utils.getOpenClawConfig();
+      const model = config.agent?.model || 'Not set';
+      const agentName = config.agent?.name || 'Not set';
+      console.log(`Agent Name: ${agentName}`);
+      console.log(`Model: ${model}`);
+    } catch {
+      console.log('Config: Unable to read OpenClaw configuration');
+    }
+
+    try {
+      await fs.access(path.join(process.cwd(), 'orientation'));
+      console.log('Orientation Directory: Present');
+    } catch {
+      console.log('Orientation Directory: Absent');
+    }
+  });
+
+// CLI entry point detection (CJS)
+if (typeof require !== 'undefined' && require.main === module) {
   program.parse();
 }
 

@@ -3,6 +3,8 @@ import * as utils from './utils.js';
 
 export async function startGateway(openClawRoot?: string): Promise<void> {
   const openclaw = utils.resolveOpenClawExecutable(openClawRoot);
+  console.log(`   🌐 Starting OpenClaw Gateway...`);
+  console.log(`   📋 Running: ${openclaw} gateway start (in background)`);
   return new Promise((resolve, reject) => {
     const child = spawn(openclaw, ['gateway', 'start'], {
       stdio: 'ignore',

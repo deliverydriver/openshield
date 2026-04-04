@@ -144,20 +144,48 @@ export interface AgentProfile {
   openClawRoot?: string;
 }
 
+async function ensureCredentialsIgnored(): Promise<void> {
+  const gitignorePath = path.join(process.cwd(), '.gitignore');
+  const entry = 'orientation/API_creds.md';
+
+  let content = '';
+  try {
+    content = await fs.readFile(gitignorePath, 'utf8');
+  } catch {
+    content = '';
+  }
+
+  const hasEntry = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .includes(entry);
+
+  if (!hasEntry) {
+    const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+    const nextContent = `${content}${separator}# OpenShield secrets\n${entry}\n`;
+    await fs.writeFile(gitignorePath, nextContent, 'utf8');
+    console.log(`   🔒 Added ${entry} to .gitignore`);
+  }
+}
+
 export async function create(agentProfile: AgentProfile): Promise<string> {
   const orientationDir = path.join(process.cwd(), 'orientation');
+  console.log(`   📁 Setting up orientation files in: ${orientationDir}`);
   await fs.mkdir(orientationDir, { recursive: true });
 
   // Generate secret
   const secret = crypto.randomUUID();
+  console.log(`   🔑 Generated agent secret`);
 
   // Write SOPs
+  console.log(`   📝 Writing SOPs.md...`);
   await fs.writeFile(
     path.join(orientationDir, 'SOPs.md'),
     SOPs_CONTENT
   );
 
   // Write API creds
+  console.log(`   📝 Writing API_creds.md...`);
   let apiCreds = API_CREDS_TEMPLATE
     .replace(/{{AGENT_NAME}}/g, agentProfile.name)
     .replace(/{{AGENT_SECRET}}/g, secret)
@@ -168,6 +196,7 @@ export async function create(agentProfile: AgentProfile): Promise<string> {
   );
 
   // Write dashboard
+  console.log(`   📝 Writing dashboard.md...`);
   let dashboard = DASHBOARD_CONTENT_TEMPLATE
     .replace(/{{AGENT_NAME}}/g, agentProfile.name)
     .replace(/{{AGENT_SECRET}}/g, secret)
@@ -179,6 +208,7 @@ export async function create(agentProfile: AgentProfile): Promise<string> {
 
   // Write OpenClaw user agent templates (in .openclaw root)
   const openClawRoot = path.resolve(agentProfile.openClawRoot || path.join(os.homedir(), '.openclaw'));
+  console.log(`   🐾 Setting up OpenClaw templates in: ${openClawRoot}`);
   await fs.mkdir(openClawRoot, { recursive: true });
 
   const agentDocs = {
@@ -193,6 +223,7 @@ export async function create(agentProfile: AgentProfile): Promise<string> {
   };
 
   for (const [fileName, template] of Object.entries(agentDocs)) {
+    console.log(`   📝 Writing ${fileName}...`);
     const payload = template
       .replace(/{{AGENT_NAME}}/g, agentProfile.name)
       .replace(/{{AGENT_DESCRIPTION}}/g, agentProfile.description)
@@ -206,6 +237,8 @@ export async function create(agentProfile: AgentProfile): Promise<string> {
   console.log(`   📝 Created orientation files for agent "${agentProfile.name}"`);
   console.log(`   🔒 Secret generated (check API_creds.md)`);
   console.log(`   🐾 OpenClaw templates saved to ${openClawRoot}`);
+
+  await ensureCredentialsIgnored();
 
   return secret;
 }

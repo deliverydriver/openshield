@@ -5,11 +5,10 @@ import ora from 'ora';
 import Table from 'cli-table3';
 import os from 'os';
 import path from 'path';
-import * as readline from 'readline';
+import fs from 'fs/promises';
 import { setModel } from './config.js';
 import { create } from './orientation.js';
 import { startGateway } from './gateway.js';
-import { sendDirective } from './directive.js';
 import { heartbeat } from './reporter.js';
 import * as utils from './utils.js';
 
@@ -18,20 +17,38 @@ const term = terminal.terminal;
 export class OpenShieldTUI {
   private spinner: any = null;
 
+  private async waitForAnyKey(): Promise<void> {
+    await new Promise<void>((resolve) => term.once('key', () => resolve()));
+  }
+
+  private async persistDashboardApiKey(apiKey: string): Promise<void> {
+    const orientationDir = path.join(process.cwd(), 'orientation');
+    const credsPath = path.join(orientationDir, 'API_creds.md');
+    const marker = '**Dashboard API Key:**';
+
+    await fs.mkdir(orientationDir, { recursive: true });
+
+    let content = '';
+    try {
+      content = await fs.readFile(credsPath, 'utf8');
+    } catch {
+      content = '# OpenShield API Credentials\n\n';
+    }
+
+    const keyLine = `${marker} \`${apiKey}\``;
+    if (content.includes(marker)) {
+      content = content.replace(/\*\*Dashboard API Key:\*\*.*$/m, keyLine);
+    } else {
+      content = `${content.trimEnd()}\n\n${keyLine}\n`;
+    }
+
+    await fs.writeFile(credsPath, content, 'utf8');
+  }
+
   constructor() {
     // Setup terminal
     term.clear();
     term.hideCursor();
-    term.grabInput({}); // Enable raw input mode for arrow keys
-    process.on('exit', () => {
-      // term.showCursor(false);
-      term.moveTo(1, term.height);
-      term('\n');
-    });
-    process.on('SIGINT', () => {
-      // term.showCursor(false);
-      process.exit(0);
-    });
   }
 
   async showWelcome() {
@@ -52,65 +69,20 @@ export class OpenShieldTUI {
   }
 
   async showMainMenu(): Promise<string> {
+    term.clear();
+    this.showWelcome();
+    term('\n');
+
     const menuItems = [
-      { label: '🚀 Initialize Agent', value: 'init' },
-      { label: '📊 View Status', value: 'status' },
-      { label: '⚙️  Configure', value: 'config' },
-      { label: '❌ Exit', value: 'exit' }
+      '🚀 Initialize Agent',
+      '📊 View Status',
+      '⚙️  Configure',
+      '❌ Exit'
     ];
 
-    const selected = await this.createMenu('Main Menu', menuItems);
-    return selected;
-  }
-
-  async createMenu(title: string, items: { label: string; value: string }[]): Promise<string> {
-    let selectedIndex = 0;
-
-    const renderMenu = () => {
-      term.clear();
-      this.showWelcome();
-
-      term(chalk.bold.yellow(title) + '\n\n');
-
-      items.forEach((item, index) => {
-        const prefix = index === selectedIndex ? chalk.green('▶ ') : '  ';
-        const text = index === selectedIndex ? chalk.bold(item.label) : chalk.gray(item.label);
-        term(prefix + text + '\n');
-      });
-
-      term('\n' + chalk.gray('Use ↑↓ to navigate, Enter to select, Ctrl+C to exit'));
-    };
-
-    renderMenu();
-
-    return new Promise((resolve) => {
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-        terminal: true
-      });
-
-      (rl as any).input.setRawMode(true);
-
-      (rl as any).input.on('data', (key: Buffer) => {
-        const keyStr = key.toString();
-
-        if (keyStr === '\u001b[A') { // Up arrow
-          selectedIndex = Math.max(0, selectedIndex - 1);
-          renderMenu();
-        } else if (keyStr === '\u001b[B') { // Down arrow
-          selectedIndex = Math.min(items.length - 1, selectedIndex + 1);
-          renderMenu();
-        } else if (keyStr === '\r' || keyStr === '\n') { // Enter
-          rl.close();
-          resolve(items[selectedIndex].value);
-        } else if (keyStr === '\u0003') { // Ctrl+C
-          rl.close();
-          // term.showCursor();
-          process.exit(0);
-        }
-      });
-    });
+    const result = await term.singleColumnMenu(menuItems, { selectedIndex: 0 }).promise;
+    const values = ['init', 'status', 'config', 'exit'];
+    return values[result.selectedIndex];
   }
 
   async runInitFlow(): Promise<void> {
@@ -270,37 +242,154 @@ export class OpenShieldTUI {
     });
   }
 
-  async showStatus() {
+  async showConfigMenu(): Promise<string> {
     term.clear();
     this.showWelcome();
+    term('\n');
 
-    term(chalk.bold.yellow('📊 Agent Status') + '\n\n');
-
-    // Check various statuses
-    const statuses = [
-      { name: 'OpenClaw', status: utils.detectOpenClaw() ? '✅ Installed' : '❌ Not found' },
-      { name: 'Gateway', status: '🔄 Checking...' }, // Would need to check if running
-      { name: 'Dashboard', status: '🔄 Checking...' }, // Would need to check connection
+    const menuItems = [
+      '🔑 Set Dashboard API Key',
+      '🤖 Set Model',
+      '📊 View Configuration',
+      '⬅️  Back to Main Menu'
     ];
 
-    const table = new Table({
-      head: [chalk.bold('Component'), chalk.bold('Status')],
-      colWidths: [20, 30]
-    });
+    const result = await term.singleColumnMenu(menuItems, { selectedIndex: 0 }).promise;
+    const values = ['set-api-key', 'set-model', 'view-config', 'back'];
+    return values[result.selectedIndex];
+  }
 
-    statuses.forEach(status => {
-      table.push([status.name, status.status]);
-    });
+  async runConfigFlow(): Promise<void> {
+    while (true) {
+      const choice = await this.showConfigMenu();
 
-    term(table.toString());
-    term('\n\n' + chalk.gray('Press any key to return to menu...'));
+      switch (choice) {
+        case 'set-api-key':
+          await this.setApiKey();
+          break;
+        case 'set-model':
+          await this.setModel();
+          break;
+        case 'view-config':
+          await this.viewConfig();
+          break;
+        case 'back':
+          return;
+      }
+    }
+  }
 
-    return new Promise<void>((resolve) => {
-      term.on('key', () => {
-        term.removeAllListeners('key');
-        resolve();
-      });
-    });
+  async setApiKey(): Promise<void> {
+    term.clear();
+    this.showWelcome();
+    term('\n' + chalk.bold.yellow('🔑 Set Dashboard API Key') + '\n\n');
+
+    const apiKey = await this.promptInput('API Key', 'Enter your dashboard API key:');
+    if (apiKey) {
+      try {
+        await this.persistDashboardApiKey(apiKey);
+        term('\n' + chalk.green('✅ API Key saved to orientation/API_creds.md') + '\n');
+      } catch (error: any) {
+        term('\n' + chalk.red(`❌ Failed to save API key: ${error.message}`) + '\n');
+      }
+    } else {
+      term('\n' + chalk.gray('Cancelled') + '\n');
+    }
+    term(chalk.gray('Press any key to continue...'));
+    await this.waitForAnyKey();
+  }
+
+  async setModel(): Promise<void> {
+    term.clear();
+    this.showWelcome();
+    term('\n' + chalk.bold.yellow('🤖 Set Model') + '\n\n');
+
+    const model = await this.promptInput('Model', 'Enter model name (e.g., xai/grok-4-1-reasoning):', 'xai/grok-4-1-reasoning');
+    if (model) {
+      try {
+        await setModel(model);
+        term('\n' + chalk.green(`✅ Model set to ${model}`) + '\n');
+
+        // Prompt for API key
+        const provider = model.split('/')[0]; // e.g., xai from xai/grok-4-1-reasoning
+        const apiKey = await this.promptInput('API Key', `Enter API key for ${provider}:`);
+        if (apiKey) {
+          await this.setApiKeyForProvider(provider, apiKey);
+        } else {
+          term('\n' + chalk.gray('API key not set') + '\n');
+        }
+      } catch (error: any) {
+        term('\n' + chalk.red(`❌ Failed to set model: ${error.message}`) + '\n');
+      }
+    } else {
+      term('\n' + chalk.gray('Cancelled') + '\n');
+    }
+    term(chalk.gray('Press any key to continue...'));
+    await this.waitForAnyKey();
+  }
+
+  async setApiKeyForProvider(provider: string, apiKey: string): Promise<void> {
+    try {
+      const openclaw = utils.resolveOpenClawExecutable();
+      const input = provider + '\n' + apiKey + '\n';
+      const output = await utils.runCommand(openclaw, ['models', 'auth'], {}, input);
+      term('\n' + chalk.green(`✅ API key set for ${provider}`) + '\n');
+    } catch (error: any) {
+      term('\n' + chalk.red(`❌ Failed to set API key: ${error.message}`) + '\n');
+    }
+  }
+
+  async viewConfig(): Promise<void> {
+    term.clear();
+    this.showWelcome();
+    term('\n' + chalk.bold.yellow('📊 Current Configuration') + '\n\n');
+
+    // Display current model
+    try {
+      const config = await utils.getOpenClawConfig();
+      term(`Model: ${config.agent?.model || 'Not set'}\n`);
+    } catch (error) {
+      term('Model: Unable to read\n');
+    }
+
+    term('\n' + chalk.gray('Press any key to continue...'));
+    await this.waitForAnyKey();
+  }
+
+  async showStatus(): Promise<void> {
+    term.clear();
+    this.showWelcome();
+    term('\n' + chalk.bold.yellow('📊 Agent Status') + '\n\n');
+
+    try {
+      const openClawAvailable = utils.detectOpenClaw();
+      term(`OpenClaw CLI: ${openClawAvailable ? chalk.green('Available') : chalk.red('Not found')}\n`);
+    } catch (error: any) {
+      term(`OpenClaw Status: ${chalk.red('Error checking')} (${error?.message || String(error)})\n`);
+    }
+
+    try {
+      const config = await utils.getOpenClawConfig();
+      const model = config.agent?.model || 'Not set';
+      const agentName = config.agent?.name || 'Not set';
+      term(`Agent Name: ${chalk.cyan(agentName)}\n`);
+      term(`Model: ${chalk.cyan(model)}\n`);
+    } catch (error: any) {
+      term(`Config: ${chalk.red('Unable to read configuration')}\n`);
+    }
+
+    const orientationExists = await (async () => {
+      try {
+        await fs.access('orientation');
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+    term(`Orientation directory: ${orientationExists ? chalk.green('Present') : chalk.yellow('Absent')}\n`);
+
+    term('\n' + chalk.gray('Press any key to continue...'));
+    await this.waitForAnyKey();
   }
 
   async run() {
@@ -314,19 +403,14 @@ export class OpenShieldTUI {
           } catch (error) {
             this.showError('Initialization failed');
             term('\n' + chalk.gray('Press any key to continue...'));
-            await new Promise(resolve => term.on('key', resolve));
+            await this.waitForAnyKey();
           }
           break;
         case 'status':
           await this.showStatus();
           break;
         case 'config':
-          // Placeholder for config menu
-          term.clear();
-          this.showWelcome();
-          term(chalk.yellow('⚙️  Configuration menu coming soon...\n\n'));
-          term(chalk.gray('Press any key to continue...'));
-          await new Promise(resolve => term.on('key', resolve));
+          await this.runConfigFlow();
           break;
         case 'exit':
           term.clear();
