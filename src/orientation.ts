@@ -44,6 +44,8 @@ const API_CREDS_TEMPLATE = `# OpenShield API Credentials
 
 **Base URL:** \`{{BASE_URL}}\`
 
+**API Reference:** https://agents.openshield.cc/docs/api
+
 ⚠️  **KEEP THIS FILE PRIVATE** ⚠️
 Do not commit to git or share.
 
@@ -53,6 +55,9 @@ const DASHBOARD_CONTENT_TEMPLATE = `# OpenShield Dashboard Instructions
 
 ## Reporting Endpoint
 \`{{BASE_URL}}\`
+
+## API Documentation
+https://agents.openshield.cc/docs/api
 
 ## Agent Info
 - Name: \`{{AGENT_NAME}}\`

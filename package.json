@@ -26,7 +26,9 @@
   "scripts": {
     "build": "rm -rf dist && tsup src/cli.ts --format cjs --dts --sourcemap && sed -i '1i#!/usr/bin/env node' dist/cli.js && chmod +x dist/cli.js && tsup src/index.ts --format cjs,esm --dts --sourcemap",
     "dev": "tsx watch src/cli.ts",
-    "prepublishOnly": "npm run build"
+    "test": "npm run build && node --test test/**/*.test.cjs",
+    "verify": "npm run test && node dist/cli.js --help > /dev/null && npm pack --dry-run > /dev/null",
+    "prepublishOnly": "npm run verify"
   },
   "dependencies": {
     "boxen": "^8.0.1",

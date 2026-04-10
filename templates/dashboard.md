@@ -1,7 +1,25 @@
-# Dashboard Template
+# OpenShield Dashboard Instructions
 
-{{PLACEHOLDER_INSTRUCTIONS}}
+## Reporting Endpoint
+`{{BASE_URL}}`
 
-Reporting endpoint: {{BASE_URL}}
+## API Documentation
+https://agents.openshield.cc/docs/api
 
-This gets customized with your agent details during init.
+## Agent Info
+- Name: `{{AGENT_NAME}}`
+- Secret: (see API_creds.md)
+
+## API Endpoints
+- POST /heartbeat
+- POST /tasks
+- POST /log
+- POST /status
+- GET /status
+- GET /logs
+
+## Heartbeat Example
+```bash
+curl -X POST "{{BASE_URL}}/heartbeat" \
+	-H "Authorization: Bearer {{AGENT_SECRET}}"
+```

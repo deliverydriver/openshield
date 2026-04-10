@@ -91,6 +91,17 @@ import { init, heartbeat, reportTask, reportLog, setStatus, getStatus, getLogs }
 
 The library entrypoint exports the initialization flow plus dashboard reporting helpers.
 
+## 🧪 Verification
+
+The package includes a smoke/integration validation suite:
+
+```bash
+npm run test      # build + node:test coverage for reporting/orientation flows
+npm run verify    # test + CLI help smoke test + npm pack dry-run
+```
+
+`npm publish` triggers `prepublishOnly`, which runs `npm run verify`.
+
 ## 🔧 Development
 
 ```bash
@@ -99,11 +110,15 @@ cd openshield
 npm install
 npm run dev          # Development mode with TUI
 npm run build        # Build for distribution
+npm run test         # Run package test suite
+npm run verify       # Full release validation
 npm pack --dry-run   # Check publish contents
 npm publish          # Publish to npm
 ```
 
 The TUI is built with `terminal-kit`, `chalk`, `boxen`, `ora`, and `cli-table3` for a rich terminal experience.
+
+Orientation files and examples reference the API docs at `https://agents.openshield.cc/docs/api`.
 
 ## 📖 License
 

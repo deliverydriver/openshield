@@ -1,9 +1,12 @@
-# API Credentials Template
+# OpenShield API Credentials
 
-Agent Secret: {{AGENT_SECRET}}
+**Agent Name:** {{AGENT_NAME}}
 
-Base URL: {{BASE_URL}}
+**Agent Secret:** `{{AGENT_SECRET}}`
 
-Agent Name: {{AGENT_NAME}}
+**Base URL:** `{{BASE_URL}}`
 
-This template gets populated during \`openshield init\`.
+**API Reference:** https://agents.openshield.cc/docs/api
+
+⚠️  **KEEP THIS FILE PRIVATE** ⚠️
+Do not commit to git or share.
